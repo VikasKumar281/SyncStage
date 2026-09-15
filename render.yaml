@@ -1,32 +1,23 @@
 services:
   - type: web
-    name: media-sequencer-api
+    name: syncstage
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
-    plan: free
+    dockerfilePath: ./Dockerfile.allinone
+    dockerContext: .
+    plan: starter
     healthCheckPath: /api/health
+
     envVars:
       - key: DATA_PATH
         value: /app/data/state.json
+
       - key: CYCLE_SECONDS
         value: "18000"
+
       - key: ALLOWED_ORIGINS
         value: "*"
+
     disk:
-      name: sequencer-data
+      name: syncstage-data
       mountPath: /app/data
       sizeGB: 1
-
-  - type: web
-    name: media-sequencer-web
-    runtime: static
-    buildCommand: cd frontend && npm install && npm run build
-    staticPublishPath: ./frontend/dist
-    envVars:
-      - key: VITE_API_BASE_URL
-        sync: false
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
