@@ -1,71 +1,59 @@
 # SyncStage
 
-A multi-window media sequencer where every display runs its own playlist while an operator can update playlists and temporarily synchronize the same media across all displays.
+> Real-time multi-display media sequencing and synchronized playback built with React and Go.
 
-SyncStage is built with a React frontend and a Go backend. The application uses a shared time-based playback model so every display can calculate what it should be showing at any moment.
+SyncStage is a digital-signage style application where multiple display windows run independent playlists while an operator can update playlists and temporarily synchronize the same media across all connected displays.
 
-The main feature is the **Sync Takeover**. An operator can select any media item and temporarily show it on all display windows at the same scheduled time. When the sync period ends, every window automatically returns to its own playlist without losing its normal position.
-
-The deployed application uses PostgreSQL for persistent storage and is packaged as a single Docker container containing both the React production build and the Go server.
-
----
+The core playback model is **time-based and deterministic**: displays calculate their expected playback position from a shared cycle anchor, the current server-adjusted time, and their own playlist. Synchronization is implemented as a temporary global override using a future server timestamp.
 
 ## Live Demo
 
-**Live Application**
+**Application:** https://syncstage.onrender.com
 
-https://syncstage.onrender.com
-
-**GitHub Repository**
-
-https://github.com/VikasKumar281/SyncStage
+**GitHub:** https://github.com/VikasKumar281/SyncStage
 
 ---
 
-# Table of Contents
+## Table of Contents
 
-1. [Project Overview](#project-overview)
-2. [Main Features](#main-features)
-3. [Technology Stack](#technology-stack)
-4. [Application Architecture](#application-architecture)
-5. [Project Structure](#project-structure)
-6. [How the Application Works](#how-the-application-works)
-7. [Time-Based Playback](#time-based-playback)
-8. [Five-Hour Cycle](#five-hour-cycle)
-9. [Playlist Looping](#playlist-looping)
-10. [Blank Media](#blank-media)
-11. [Sync Takeover](#sync-takeover)
-12. [Clock Synchronization](#clock-synchronization)
-13. [Server-Sent Events](#server-sent-events)
-14. [Returning From Sync](#returning-from-sync)
-15. [Dynamic Playlist Updates](#dynamic-playlist-updates)
-16. [Detached Display Windows](#detached-display-windows)
-17. [Video Playback](#video-playback)
-18. [Persistent Storage](#persistent-storage)
-19. [Seed Data](#seed-data)
-20. [API Reference](#api-reference)
-21. [Local Development](#local-development)
-22. [Environment Variables](#environment-variables)
-23. [Running With Docker](#running-with-docker)
-24. [Running With Docker Compose](#running-with-docker-compose)
-25. [Production Deployment](#production-deployment)
-26. [Testing](#testing)
-27. [Go and JavaScript Timeline Parity](#go-and-javascript-timeline-parity)
-28. [Manual Verification](#manual-verification)
-29. [Design Decisions](#design-decisions)
-30. [Assumptions](#assumptions)
-31. [Known Limitations](#known-limitations)
-32. [Future Improvements](#future-improvements)
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Technology Stack](#technology-stack)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Playback Model](#playback-model)
+- [Five-Hour Cycle](#five-hour-cycle)
+- [Playlist Looping](#playlist-looping)
+- [Blank Media](#blank-media)
+- [Global Sync Takeover](#global-sync-takeover)
+- [Clock Synchronization](#clock-synchronization)
+- [Real-Time Communication](#real-time-communication)
+- [Dynamic Playlist Updates](#dynamic-playlist-updates)
+- [Video Playback](#video-playback)
+- [Detached Displays](#detached-displays)
+- [Persistence](#persistence)
+- [Seed Data](#seed-data)
+- [API Reference](#api-reference)
+- [Local Development](#local-development)
+- [Environment Variables](#environment-variables)
+- [Docker](#docker)
+- [Docker Compose](#docker-compose)
+- [Production Deployment](#production-deployment)
+- [Testing](#testing)
+- [Manual Verification](#manual-verification)
+- [Design Decisions](#design-decisions)
+- [Assumptions](#assumptions)
+- [Known Limitations](#known-limitations)
+- [Future Improvements](#future-improvements)
+- [Submission Checklist](#submission-checklist)
 
 ---
 
-# Project Overview
+# Overview
 
-SyncStage simulates a small digital-signage/media-display system.
+SyncStage simulates a small multi-display media system.
 
-There are multiple display windows and every window has its own playlist.
-
-For example:
+Each display has an independent playlist:
 
 ```text
 Window 1 — Lobby
@@ -81,182 +69,132 @@ Window 4 — Corridor
 M6 → M3 → M2 → M4 → Blank → repeat
 ```
 
-Every window continues playing its own sequence independently.
+The displays share the same five-hour cycle reference, but each window resolves its own playlist independently.
 
-The operator can modify a playlist while the application is running.
+An operator can:
 
-For example:
-
-```text
-Before:
-
-Window 1
-M1 → M2 → M4
-```
-
-The operator can add another media item:
-
-```text
-After:
-
-Window 1
-M1 → M2 → M4 → M6
-```
-
-The change is stored in the backend and pushed to connected displays.
-
-The second major feature is synchronized playback.
-
-For example, if the operator selects `M2` and starts a 10-second sync:
-
-```text
-Window 1 → M2
-Window 2 → M2
-Window 3 → M2
-Window 4 → M2
-```
-
-All windows switch to the selected media at the same scheduled instant.
-
-After 10 seconds, the sync ends and each window returns to its own timeline.
+- view multiple display windows
+- add media to playlists
+- remove media from playlists
+- create media
+- create display windows
+- trigger a global synchronization takeover
+- select the synchronization media
+- configure synchronization duration
+- reset the playback cycle
+- open individual displays separately
 
 ---
 
-# Main Features
+# Key Features
 
-## Display and Playback
+### Display & Playback
 
 - Multiple display windows
-- Independent playlist for every window
+- Independent playlist per window
 - Continuous playlist playback
 - Five-hour repeating cycle
 - Image media
 - Video media
-- Blank media
+- Explicit blank media
 - Configurable media duration
 - Current media indicator
 - Remaining-time display
-- Playback progress indicator
+- Playback progress
 - Next-media information
 
-## Playlist Management
+### Playlist Management
 
 - Add media to a playlist
 - Remove media from a playlist
-- Change playlists while playback is running
-- Updates are propagated to connected displays
+- Modify playlists while playback is running
+- Persist playlist changes
+- Push updates to connected displays through SSE
 
-## Synchronization
+### Synchronization
 
 - Global sync takeover
-- Selectable media
+- Selectable sync media
 - Configurable sync duration
-- Future timestamp based synchronization
-- Client/server clock calibration
+- Future-timestamp synchronization
+- Server/client clock calibration
 - Temporary sync override
-- Automatic return to each window's normal sequence
+- Automatic return to each window's normal timeline
 
-## Real-Time Communication
+### Real-Time Communication
 
-- Server-Sent Events
-- Automatic client reconnection through `EventSource`
-- Complete state snapshots
+- Server-Sent Events (SSE)
+- Automatic browser `EventSource` reconnection
+- State snapshots
 - Live playlist updates
-- Live sync events
+- Live synchronization events
 - Cycle reset events
 
-## Persistence
+### Persistence
 
-- PostgreSQL storage
-- Neon PostgreSQL for the deployed version
+- PostgreSQL in production
+- Neon PostgreSQL for deployment
+- JSONB state storage
+- Automatic database table creation
 - Seed data on first startup
-- Storage abstraction
-- Local JSON storage fallback for development
+- Local JSON fallback for development
 
-## Deployment
+### Deployment
 
-- Docker
 - Multi-stage Docker build
-- React and Go in one container
+- React production build
+- Go backend
+- Single-container deployment
 - Render deployment
-- PostgreSQL through Neon
-- Health check endpoint
-
-## Testing
-
-- Go unit tests
-- API tests
-- Scheduler/timeline tests
-- Persistence tests
-- CORS tests
-- Go ↔ JavaScript timeline parity verification
+- Neon PostgreSQL
+- Health-check endpoint
 
 ---
 
 # Technology Stack
 
-## Frontend
-
-- React
-- Vite
-- JavaScript
-- CSS
-- Browser EventSource API
-
-## Backend
-
-- Go
-- Standard HTTP server
-- REST APIs
-- Server-Sent Events
-- Time-based scheduler
-- Storage abstraction
-
-## Database
-
-- PostgreSQL
-- JSONB
-
-The deployed application uses Neon PostgreSQL.
-
-## Infrastructure
-
-- Docker
-- Render
+| Layer | Technology |
+|---|---|
+| Frontend | React, Vite, JavaScript, CSS |
+| Backend | Go |
+| API | REST |
+| Real-time | Server-Sent Events |
+| Database | PostgreSQL / JSONB |
+| Production DB | Neon PostgreSQL |
+| Containerization | Docker |
+| Deployment | Render |
+| Source Control | GitHub |
 
 ---
 
-# Application Architecture
+# Architecture
 
-The application follows a simple client/server architecture.
+SyncStage follows a simple client/server architecture.
 
 ```text
-                        ┌─────────────────────┐
-                        │      Browser 1      │
-                        │    React Display    │
-                        └──────────┬──────────┘
-                                   │
-                                   │ REST + SSE
-                                   │
-                        ┌──────────▼──────────┐
-                        │                     │
-                        │     Go Backend      │
-                        │                     │
-                        │  REST API           │
-                        │  Scheduler          │
-                        │  SSE Hub            │
-                        │  Storage Layer      │
-                        │                     │
-                        └──────────┬──────────┘
-                                   │
-                                   │
-                        ┌──────────▼──────────┐
-                        │    PostgreSQL       │
-                        │      / Neon         │
-                        └─────────────────────┘
+                         ┌─────────────────────┐
+                         │      Browser 1      │
+                         │    React Display    │
+                         └──────────┬──────────┘
+                                    │
+                                    │ REST + SSE
+                                    │
+                         ┌──────────▼──────────┐
+                         │     Go Backend      │
+                         │                     │
+                         │  REST API           │
+                         │  Scheduler          │
+                         │  SSE Hub            │
+                         │  Storage Layer      │
+                         └──────────┬──────────┘
+                                    │
+                                    │
+                         ┌──────────▼──────────┐
+                         │   PostgreSQL/Neon   │
+                         └─────────────────────┘
 ```
 
-Multiple browsers can connect to the same backend:
+Multiple displays connect to the same backend:
 
 ```text
 Browser 1 ─┐
@@ -265,43 +203,39 @@ Browser 3 ─┼──→ Go Backend ──→ PostgreSQL
 Browser 4 ─┘
 ```
 
-The backend maintains the application state.
+The backend owns the authoritative application state.
 
-The browser receives the current state and live updates, while the actual playback position is calculated from time.
+The browser receives that state and calculates the current playback position locally using the shared timeline and server-adjusted time.
 
 ---
 
 # Production Architecture
 
-For production, the React application is built into static files and served by the Go backend.
+The production application is packaged into a single Docker container.
 
 ```text
-                    Render
-                      │
-                      ▼
-              ┌─────────────────┐
-              │  Docker Image   │
-              │                 │
-              │  Go Server      │
-              │       +         │
-              │  React dist/    │
-              │                 │
-              └────────┬────────┘
-                       │
-                       │ DATABASE_URL
-                       ▼
-              ┌─────────────────┐
-              │ Neon PostgreSQL │
-              └─────────────────┘
+GitHub
+   ↓
+Render
+   ↓
+Docker Image
+   ├── React production build
+   ├── Go server
+   └── Bundled video assets
+   ↓
+SyncStage
+   ↓
+Neon PostgreSQL
 ```
 
-This gives the production application a single origin:
+The single-container architecture means the browser uses one origin for:
 
 ```text
-https://syncstage.onrender.com
+Frontend
+API
+SSE
+Bundled videos
 ```
-
-The frontend and backend therefore do not need separate public domains.
 
 ---
 
@@ -317,51 +251,32 @@ SyncStage/
 │   │
 │   ├── internal/
 │   │   ├── api/
-│   │   │   ├── server.go
-│   │   │   ├── middleware.go
-│   │   │   ├── hub.go
-│   │   │   └── server_test.go
-│   │   │
-│   │   ├── scheduler/
-│   │   │   ├── scheduler.go
-│   │   │   └── scheduler_test.go
-│   │   │
-│   │   ├── storage/
-│   │   │   ├── store.go
-│   │   │   ├── jsonstore/
-│   │   │   └── pgstore/
-│   │   │
+│   │   ├── config/
 │   │   ├── models/
-│   │   │   └── models.go
-│   │   │
+│   │   ├── scheduler/
 │   │   ├── seed/
-│   │   │   └── seed.go
-│   │   │
-│   │   └── config/
-│   │       └── config.go
+│   │   └── storage/
+│   │       ├── jsonstore/
+│   │       └── pgstore/
 │   │
 │   ├── Dockerfile
 │   ├── go.mod
 │   └── go.sum
 │
 ├── frontend/
+│   ├── public/
+│   │   ├── Logo.png
+│   │   └── videos/
+│   │       ├── m4.mp4
+│   │       └── m5.mp4
+│   │
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── WindowPlayer.jsx
-│   │   │   ├── MediaSurface.jsx
-│   │   │   ├── ControlPanel.jsx
-│   │   │   └── StatusBar.jsx
-│   │   │
 │   │   ├── lib/
-│   │   │   ├── timeline.js
-│   │   │   ├── api.js
-│   │   │   └── useSequencer.js
-│   │   │
 │   │   └── App.jsx
 │   │
 │   ├── scripts/
 │   │   └── verify-parity.mjs
-│   │
 │   ├── package.json
 │   └── vite.config.js
 │
@@ -373,54 +288,18 @@ SyncStage/
     └── ARCHITECTURE.md
 ```
 
-The most important playback files are:
+Important playback implementations:
 
 ```text
 backend/internal/scheduler/scheduler.go
 frontend/src/lib/timeline.js
 ```
 
-The Go backend and React frontend both use the same timeline rules.
-
 ---
 
-# How the Application Works
+# Playback Model
 
-The overall flow is:
-
-```text
-1. Backend starts
-       ↓
-2. Configuration is loaded
-       ↓
-3. PostgreSQL is opened
-       ↓
-4. Existing state is loaded
-       ↓
-5. If no state exists, seed data is created
-       ↓
-6. HTTP server starts
-       ↓
-7. React frontend connects
-       ↓
-8. Browser gets initial state
-       ↓
-9. Browser calibrates its clock
-       ↓
-10. Browser calculates playback from time
-       ↓
-11. SSE keeps the state updated
-```
-
-The server does not need to send a "play next media" command every time an item ends.
-
-Instead, both the server and browser can determine the current playback from the shared timeline.
-
----
-
-# Time-Based Playback
-
-The main playback design is based on time.
+The most important design decision is that playback is **time-based**, not command-driven.
 
 Conceptually:
 
@@ -428,18 +307,17 @@ Conceptually:
 resolve(window, currentTime)
 ```
 
-returns information such as:
+determines:
 
-```text
-current media
-start time
-end time
-remaining time
-playlist index
-cycle index
-```
+- current media
+- playlist index
+- cycle index
+- item start time
+- item end time
+- remaining time
+- playback source
 
-For example, suppose a window has:
+Example:
 
 ```text
 M1 = 8 seconds
@@ -447,7 +325,7 @@ M2 = 8 seconds
 M4 = 15 seconds
 ```
 
-The playlist timeline is:
+Timeline:
 
 ```text
 0s        8s        16s                  31s
@@ -455,180 +333,78 @@ The playlist timeline is:
     M1         M2             M4
 ```
 
-At:
-
-```text
-5 seconds
-```
-
-the current media is:
+At 5 seconds:
 
 ```text
 M1
 ```
 
-At:
-
-```text
-12 seconds
-```
-
-the current media is:
+At 12 seconds:
 
 ```text
 M2
 ```
 
-At:
-
-```text
-20 seconds
-```
-
-the current media is:
+At 20 seconds:
 
 ```text
 M4
 ```
 
-The browser can calculate this without asking the backend which media comes next.
+The browser does not need a server command for every media transition.
 
----
-
-# Why Playback Is Time-Based
-
-A simpler design could have been:
+Instead:
 
 ```text
-Browser
-   ↓
-"What should I play?"
-
-Server
-   ↓
-"Play M2"
-
-Browser
-   ↓
-"What next?"
-
-Server
-   ↓
-"Play M4"
-```
-
-That approach creates unnecessary dependency on network requests.
-
-If a display temporarily loses its connection, its playback could become incorrect.
-
-In SyncStage, playback is derived from:
-
-```text
-cycle anchor
-+
-current time
-+
+shared cycle anchor
+        +
+server-adjusted current time
+        +
 window playlist
+        ↓
+current media
 ```
 
-Therefore a display can determine its position again after:
-
-- a page refresh
-- reconnecting to the server
-- opening a display late
-- a temporary SSE disconnect
-
-The backend is still responsible for the authoritative state, but it does not have to act as a real-time remote control for every media transition.
-
----
-
-# Continuous Playback
-
-Each window's playlist loops continuously.
-
-Example:
-
-```text
-M1 → M2 → M4 → M1 → M2 → M4 → ...
-```
-
-The frontend calculates when the current item ends and schedules the next timeline calculation around that point.
-
-The player does not continuously poll the server for the next item.
-
-The current playback calculation uses:
-
-```text
-startedAtMs
-endsAtMs
-```
-
-and the frontend schedules its next update using the remaining duration.
-
-A small timing cushion is used around the transition so the recalculation lands inside the next timeline slot instead of repeatedly hitting the exact boundary.
-
-The progress bar uses a separate, slower refresh interval.
-
-This keeps:
-
-```text
-media switching
-```
-
-separate from:
-
-```text
-visual progress updates
-```
+This allows a display to recover its expected position after refreshes or reconnections.
 
 ---
 
 # Five-Hour Cycle
 
-The required cycle length is five hours.
-
-The application represents five hours as:
+The required normal playback cycle is five hours.
 
 ```text
 5 × 60 × 60 × 1000
-```
-
-which is:
-
-```text
+=
 18,000,000 milliseconds
 ```
 
-The default configuration is:
+Production configuration:
 
 ```text
 CYCLE_SECONDS=18000
 ```
 
-The cycle is shared across all windows.
-
-However, every window still has its own playlist.
-
-For example:
+All windows share the same cycle reference:
 
 ```text
-                    Shared 5-hour cycle
-                            │
-          ┌─────────────────┼─────────────────┐
-          ▼                 ▼                 ▼
-       Window 1          Window 2          Window 3
-       M1 M2 M4          M3 B M2 M6        M5 M1
+                 Shared 5-hour cycle
+                         │
+          ┌──────────────┼──────────────┐
+          ▼              ▼              ▼
+       Window 1       Window 2       Window 3
+       M1 M2 M4       M3 B M2 M6     M5 M1
 ```
 
-The cycle provides a common time reference while each playlist remains independent.
+The cycle is shared, while playlists remain independent.
 
 ---
 
 # Playlist Looping
 
-The playlist does not have to be exactly five hours long.
+A playlist does not need to be exactly five hours long.
 
-For example:
+Example:
 
 ```text
 M1 = 8 seconds
@@ -636,125 +412,85 @@ M2 = 8 seconds
 M4 = 15 seconds
 ```
 
-Total:
+Total playlist duration:
 
 ```text
 31 seconds
 ```
 
-The playlist repeats:
+The playlist loops:
 
 ```text
 M1 → M2 → M4 → M1 → M2 → M4 → ...
 ```
 
-The current position inside the playlist is determined using the position inside the current five-hour cycle.
+The current position is resolved from the position within the shared five-hour cycle.
 
 ---
 
 # Five-Hour Boundary
 
-A media item may cross the five-hour boundary.
+If an item crosses the five-hour boundary, it is truncated at the boundary.
 
-For example:
+Example:
 
 ```text
-Five-hour boundary is 3 seconds away.
+Current media has 10 seconds remaining.
 
-Current media normally has:
-10 seconds remaining.
+Only 3 seconds remain in the five-hour cycle.
 ```
 
-The application does not extend the current cycle beyond five hours.
-
-Instead:
+Playback becomes:
 
 ```text
 Current media
-      │
-      ├── 3 seconds
-      │
-      ▼
+     │
+     ├── 3 seconds
+     │
+     ▼
 5-hour boundary
-      │
-      ▼
+     │
+     ▼
 New cycle
-      │
-      ▼
+     │
+     ▼
 Playlist item 0
 ```
 
-The current item is truncated at the cycle boundary.
-
-The next cycle starts from the first playlist item.
-
-No automatic blank media is inserted to fill the remaining time.
+No automatic blank padding is inserted.
 
 ---
 
 # Blank Media
 
-Blank is treated as a real media type.
+Blank is an explicit media type.
 
-For example:
+Example:
 
 ```text
 M3 → Blank → M2
 ```
 
-means that the window intentionally shows a blank state for the duration configured for that playlist item.
+The blank item is displayed for its configured duration.
 
-Blank is not used automatically to pad the five-hour cycle.
+Blank playback occurs only when a blank item is explicitly included in a playlist.
 
-For example:
-
-```text
-M1 → M2 → M4
-```
-
-does not become:
-
-```text
-M1 → M2 → M4 → Blank → Blank → ...
-```
-
-just because the playlist does not fill the entire five-hour period.
-
-Blank appears only when:
-
-```text
-type = blank
-```
-
-is explicitly configured.
-
-An empty playlist is a separate state.
-
-If a window has no playlist items, the UI shows that nothing is scheduled rather than treating the empty playlist as a configured blank item.
+An empty playlist is treated separately and does not automatically become a blank playlist.
 
 ---
 
-# Sync Takeover
+# Global Sync Takeover
 
-The sync feature allows the operator to temporarily override all normal playlists.
+Sync Takeover temporarily overrides the normal playback of all windows.
 
-For example:
-
-```text
-Selected media:
-M2
-
-Duration:
-10 seconds
-```
-
-The operator clicks:
+Example:
 
 ```text
-Sync all windows
+Selected media: M2
+Duration: 10 seconds
 ```
 
-The desired result is:
+During the takeover:
 
 ```text
 Window 1 → M2
@@ -763,50 +499,39 @@ Window 3 → M2
 Window 4 → M2
 ```
 
-and all windows should start the sync as close to the same instant as possible.
+After the duration expires:
+
+```text
+Window 1 → normal sequence
+Window 2 → normal sequence
+Window 3 → normal sequence
+Window 4 → normal sequence
+```
+
+The normal playlists are not replaced.
 
 ---
 
-# Why Immediate Sync Is Not Enough
+# Why Future-Timestamp Sync?
 
-A basic implementation might send:
+An immediate command such as:
 
 ```text
 "Play M2 now"
 ```
 
-to every browser.
-
-The problem is that the message will not arrive at exactly the same time on every machine.
+would not arrive at exactly the same time on every browser.
 
 For example:
 
 ```text
-Window 1 → receives at T + 80ms
-Window 2 → receives at T + 130ms
-Window 3 → receives at T + 210ms
-Window 4 → receives at T + 270ms
+Window 1 → +80ms
+Window 2 → +130ms
+Window 3 → +210ms
+Window 4 → +270ms
 ```
 
-Even though all browsers received the same message, they would not switch at the same instant.
-
-Network latency, rendering time and browser scheduling can all introduce small differences.
-
----
-
-# Future-Timestamp Sync
-
-SyncStage treats synchronization as a scheduled event instead of an immediate command.
-
-When the operator starts a sync, the backend calculates:
-
-```text
-current server time
-+
-sync lead time
-=
-scheduled start time
-```
+Instead, SyncStage schedules the takeover for a future server timestamp.
 
 The default lead time is:
 
@@ -814,70 +539,17 @@ The default lead time is:
 SYNC_LEAD_MS=1200
 ```
 
-For example:
+So the backend normally schedules synchronization approximately 1.2 seconds in the future.
 
-```text
-Current server time:
-1789466864364
-
-Scheduled start:
-1789466865564
-```
-
-The difference is:
-
-```text
-1200 milliseconds
-```
-
-The server sends the scheduled timestamp to connected clients.
-
-Each browser receives the event and waits for that same timestamp according to its calibrated server clock.
-
-The event therefore does not need to arrive at exactly the moment the sync starts.
-
-It only needs to arrive before the scheduled start.
-
----
-
-# Sync Timeline
-
-The process looks like this:
-
-```text
-Operator
-   │
-   │ Click "Sync all windows"
-   ▼
-Go Backend
-   │
-   │ Calculate future startAtMs
-   ▼
-SSE Broadcast
-   │
-   ├─────────────┬─────────────┬─────────────┐
-   ▼             ▼             ▼             ▼
-Window 1      Window 2      Window 3      Window 4
-   │             │             │             │
-   │             │             │             │
-   └─────────────┴─────────────┴─────────────┘
-                         │
-                         ▼
-                 Scheduled timestamp
-                         │
-                         ▼
-                 All show selected media
-```
+Each client receives the same target timestamp and switches when its server-adjusted clock reaches that timestamp.
 
 ---
 
 # Clock Synchronization
 
-The future-timestamp approach requires the browsers to have a reasonably accurate idea of server time.
-
 Different machines can have different local clocks.
 
-For example:
+Example:
 
 ```text
 Machine A → 12:00:00.000
@@ -885,34 +557,15 @@ Machine B → 11:59:59.700
 Machine C → 12:00:00.250
 ```
 
-If the browsers used their local clocks directly, they could disagree about when the scheduled timestamp occurs.
+The frontend therefore calls:
 
-To reduce this difference, the frontend uses:
-
-```text
+```http
 GET /api/time
 ```
 
-to measure the server clock.
+to estimate the server clock.
 
----
-
-# Clock Calibration Process
-
-The browser sends multiple time requests.
-
-For each request:
-
-```text
-1. Record local send time
-2. Send request to /api/time
-3. Receive server timestamp
-4. Record local receive time
-5. Calculate round-trip time
-6. Estimate server clock offset
-```
-
-The basic calculation is:
+The approximate calculation is:
 
 ```text
 offsetMs =
@@ -920,136 +573,64 @@ serverTimeMs -
 (sentAt + roundTripMs / 2)
 ```
 
-The browser then calculates:
+Then:
 
 ```text
 serverNow() =
 Date.now() + offsetMs
 ```
 
-The frontend periodically recalibrates the offset.
+The frontend periodically recalibrates the clock offset.
 
-The current clock offset and round-trip information are displayed in the application UI.
-
----
-
-# Why Multiple Time Probes Are Used
-
-Network latency is not always consistent.
-
-For example:
-
-```text
-Probe 1 → 180ms
-Probe 2 → 95ms
-Probe 3 → 72ms
-Probe 4 → 140ms
-Probe 5 → 88ms
-```
-
-The lowest round-trip sample is usually the best approximation for estimating the server clock because it contains less network delay.
-
-The frontend therefore uses the best available sample rather than blindly trusting one request.
+Multiple probes are used because network latency can vary.
 
 ---
 
 # Returning From Sync
 
-One important requirement is that the normal playlists must not be lost when a sync starts.
-
-SyncStage does not solve this by doing:
+SyncStage does not use:
 
 ```text
 save current position
         ↓
-show sync
+show sync media
         ↓
-restore saved position
+restore old position
 ```
 
 Instead, the normal timeline continues logically underneath the sync.
 
-For example:
+Example:
 
 ```text
 Normal Window 1:
-
 M1 → M2 → M4 → M1 → ...
-```
 
-A sync starts:
-
-```text
+Sync starts:
 SYNC → M6
+
+Sync ends:
+    ↓
+resolve normal timeline again
+    ↓
+show whatever Window 1 should display now
 ```
 
-While M6 is being displayed, the normal Window 1 timeline is still based on the current time.
-
-When the sync ends:
-
-```text
-SYNC ends
-    ↓
-resolve normal sequence
-    ↓
-show whatever Window 1 should be showing now
-```
-
-This means every window automatically returns to its own sequence without needing a special restore operation.
+This means every display automatically resumes its correct sequence without manually storing a playback position.
 
 ---
 
-# Example
+# Real-Time Communication
 
-Suppose:
+SyncStage uses Server-Sent Events for server-to-browser updates.
 
-```text
-Window 1:
-M1 → M2 → M4
+Endpoint:
 
-Window 2:
-M3 → Blank → M2 → M6
-```
-
-A sync starts:
-
-```text
-M5 for 10 seconds
-```
-
-During sync:
-
-```text
-Window 1 → M5
-Window 2 → M5
-Window 3 → M5
-Window 4 → M5
-```
-
-After sync:
-
-```text
-Window 1 → its normal sequence
-Window 2 → its normal sequence
-Window 3 → its normal sequence
-Window 4 → its normal sequence
-```
-
-The playlists themselves were never replaced.
-
----
-
-# Server-Sent Events
-
-SyncStage uses Server-Sent Events for live state updates.
-
-The frontend opens:
-
-```text
+```http
 GET /api/events
 ```
 
-using the browser's:
+The frontend uses the browser's native:
 
 ```javascript
 EventSource
@@ -1057,9 +638,7 @@ EventSource
 
 API.
 
-The server sends complete snapshots when relevant changes happen.
-
-Events include:
+Important events include:
 
 ```text
 snapshot
@@ -1071,273 +650,143 @@ window.created
 cycle.reset
 ```
 
-This allows connected display windows to receive updates without repeatedly polling the backend.
+A newly connected client receives the current snapshot.
 
 ---
 
 # Why SSE Instead of WebSockets?
 
-The application's real-time communication is mostly:
+The main live communication pattern is:
 
 ```text
 Server → Browser
 ```
 
-Client-side operations such as:
+Operator actions use normal REST requests:
 
 ```text
-add playlist item
-remove playlist item
-create media
-trigger sync
+POST
+DELETE
 ```
 
-are normal HTTP REST requests.
+SSE is therefore a simple fit because it provides:
 
-Because the live communication is primarily one-way, Server-Sent Events are a good fit.
-
-Advantages:
-
-- Simple browser API
-- Uses normal HTTP
-- Easy to reconnect
-- Simple event model
-- Good fit for server-to-client state updates
-- No need to implement a full duplex socket protocol
-
----
-
-# Frontend State Management
-
-The main frontend sequencer logic is handled through:
-
-```text
-frontend/src/lib/useSequencer.js
-```
-
-The hook manages:
-
-```text
-snapshot
-connection state
-errors
-clock offset
-round-trip time
-actions
-```
-
-The browser connects to the SSE endpoint:
-
-```javascript
-const source = new EventSource(api.eventsUrl());
-```
-
-It listens for the application events and updates the local snapshot.
-
-The hook also periodically recalibrates the clock.
-
-When the browser becomes visible again after being in the background, it refreshes the state and recalibrates the clock.
-
----
-
-# WindowPlayer
-
-Each display is rendered by:
-
-```text
-frontend/src/components/WindowPlayer.jsx
-```
-
-The component receives:
-
-```text
-snapshot
-window
-serverNow()
-```
-
-and resolves the current playback.
-
-Conceptually:
-
-```text
-snapshot
-   +
-window
-   +
-serverNow()
-       │
-       ▼
-    resolve()
-       │
-       ▼
-current playback
-       │
-       ▼
-MediaSurface
-```
-
-The component also shows:
-
-- Window name
-- Number of playlist items
-- Current media
-- Remaining time
-- Progress
-- Next media
-- Sync status
-- Playlist items
-- Detach button
-
-The component defensively handles missing or empty playlists so the UI does not fail while state is loading or if a window has no configured items.
-
----
-
-# Video Playback
-
-Images are displayed directly.
-
-Videos require additional handling because a video can be joined in the middle of its timeline.
-
-For example, if the timeline says:
-
-```text
-Video should currently be at 7.2 seconds
-```
-
-the player can seek toward that position instead of always starting from:
-
-```text
-0 seconds
-```
-
-This is important when:
-
-- A browser opens in the middle of a cycle.
-- A display is refreshed.
-- A new display joins.
-- A sync takeover ends.
-- The timeline moves to a video item after another media item.
-
-Videos are played muted and inline because browsers commonly restrict autoplay when audio is enabled.
+- native browser support
+- normal HTTP
+- automatic `EventSource` reconnect behavior
+- simple server-to-client events
+- less protocol complexity than full WebSockets
 
 ---
 
 # Dynamic Playlist Updates
 
-Playlist changes can be made while the application is running.
+Playlist changes can happen while playback is running.
 
 Example:
 
 ```text
-Initial:
+Before:
 
-Window 1
 M1 → M2 → M4
 ```
 
-Add:
-
-```text
-M6
-```
-
-Result:
+After adding M6:
 
 ```text
 M1 → M2 → M4 → M6
 ```
 
-The frontend sends a REST request:
-
-```text
-POST /api/windows/{id}/playlist
-```
-
 The backend:
 
 ```text
-1. Validates the request
-2. Loads current state
-3. Updates the playlist
-4. Persists the new state
-5. Broadcasts the updated snapshot
+1. validates the request
+2. loads current state
+3. applies the mutation
+4. persists the updated state
+5. broadcasts the new state through SSE
 ```
 
-Connected displays receive the update through SSE.
+Connected displays can update without a full page reload.
 
 ---
 
-# Removing Playlist Items
+# Video Playback
 
-Playlist items can also be removed while the application is running.
+Images can be displayed directly.
 
-Endpoint:
+Videos require additional handling because the timeline may indicate that a video should already be part-way through its duration.
+
+The video player therefore:
+
+- loads the selected video
+- waits for metadata when necessary
+- calculates elapsed playback time
+- seeks toward the expected timeline position
+- starts playback
+- keeps video muted and inline for browser autoplay compatibility
+
+This helps after:
+
+- page refresh
+- late display connection
+- timeline changes
+- sync release
+
+## Bundled Demo Videos
+
+The seeded video files are stored locally:
 
 ```text
-DELETE /api/windows/{id}/playlist/{itemId}
+frontend/public/videos/m4.mp4
+frontend/public/videos/m5.mp4
 ```
 
-After successful deletion:
+They are included in the Docker image and served by the Go server:
 
 ```text
-PostgreSQL
-     ↓
-updated state
-     ↓
-SSE
-     ↓
-connected clients
+/videos/m4.mp4
+/videos/m5.mp4
 ```
 
-The displays update without requiring a full page reload.
+Therefore the core demo does not depend on an external video host.
+
+User-created media can still reference external URLs.
 
 ---
 
-# Detached Display Windows
+# Detached Displays
 
-Each window has a:
+Individual displays can be opened separately using the `window` query parameter.
 
-```text
-Detach
-```
-
-button.
-
-The purpose is to open a single display independently from the control interface.
-
-For example:
+Example:
 
 ```text
 https://syncstage.onrender.com/?window=w1
 ```
 
-can be used to open one display.
-
-This is useful for testing the actual multi-window behavior.
-
-A test setup can look like:
+This allows a realistic multi-display setup:
 
 ```text
-Browser Window 1 → Display 1
-Browser Window 2 → Display 2
-Browser Window 3 → Display 3
-Browser Window 4 → Display 4
+Browser Window 1 → Window 1
+Browser Window 2 → Window 2
+Browser Window 3 → Window 3
+Browser Window 4 → Window 4
 ```
 
-Then the operator can trigger a sync and visually verify that the displays switch together.
+The operator can then trigger a global sync and observe the synchronized takeover across displays.
 
 ---
 
-# Persistent Storage
+# Persistence
 
-The deployed version uses PostgreSQL.
+Production uses PostgreSQL through Neon.
 
-The application has a storage abstraction so the rest of the backend does not need to know whether the current store is PostgreSQL or the local JSON fallback.
+The backend has a storage abstraction so the application logic is not tightly coupled to a specific storage implementation.
 
 The PostgreSQL implementation stores the application state as JSONB.
 
-The main table is:
+The required table is:
 
 ```sql
 CREATE TABLE IF NOT EXISTS sequencer_state (
@@ -1347,134 +796,65 @@ CREATE TABLE IF NOT EXISTS sequencer_state (
 );
 ```
 
-The stored state contains the application aggregate, including:
-
-```text
-media
-windows
-playlists
-cycle information
-active sync
-```
-
----
-
-# Why JSONB Storage?
-
-The application's state is relatively small and is naturally represented as one aggregate.
-
-The project does not need a large reporting system or complex relational queries.
-
-Therefore, storing the complete state as PostgreSQL JSONB keeps the persistence layer simple.
-
-The flow is:
-
-```text
-Application State
-       ↓
-JSON Marshal
-       ↓
-PostgreSQL JSONB
-```
-
-When loading:
-
-```text
-PostgreSQL JSONB
-       ↓
-JSON Unmarshal
-       ↓
-Application State
-```
-
----
-
-# Storage Updates
-
-State updates are serialized inside the storage layer.
-
-The basic update flow is:
-
-```text
-Request
-   ↓
-Lock
-   ↓
-Load current state
-   ↓
-Apply mutation
-   ↓
-Serialize state
-   ↓
-Write to PostgreSQL
-   ↓
-Unlock
-```
-
-This prevents simple concurrent read-modify-write operations from overwriting each other's changes.
+The persisted state includes the application's media, windows, playlists, cycle information, and active synchronization state.
 
 ---
 
 # PostgreSQL Startup
 
-When the backend starts with a configured:
+When `DATABASE_URL` is configured:
 
-```text
-DATABASE_URL
-```
+1. PostgreSQL storage is opened.
+2. The connection is checked.
+3. The required table is created if necessary.
+4. Existing state is loaded.
+5. Seed data is written if no state exists.
+6. Video URL migration is applied for the bundled demo videos.
 
-it uses PostgreSQL storage.
-
-If the database table does not exist, it is created automatically.
-
-If the state row does not exist, the application creates the initial state from the seed data.
-
-Therefore the deployed application can start with working example data without manually inserting records into the database.
+This makes the production service self-initializing.
 
 ---
 
 # Local JSON Fallback
 
-For local development, if:
+When:
 
 ```text
 DATABASE_URL
 ```
 
-is not configured, the application can use the JSON storage implementation.
+is not configured, the application can use local JSON storage.
 
-This makes it possible to run the backend locally without requiring PostgreSQL.
+Default path:
 
-For production, PostgreSQL is used because the deployed application requires persistent storage.
+```text
+data/state.json
+```
+
+This is useful for local development without PostgreSQL.
+
+Production uses Neon PostgreSQL.
 
 ---
 
 # Seed Data
 
-The project includes seed data for immediate demonstration.
-
-The seed contains:
+The application includes demonstration data:
 
 ```text
 7 media items
 4 display windows
 ```
 
-The media set includes:
+The seeded media demonstrates:
 
 ```text
-M1 → image
-M2 → image
-M3 → image
-M4 → video
-M5 → video
-M6 → image
-Blank → blank
+Image
+Video
+Blank
 ```
 
-The seeded windows have different playlists.
-
-Example:
+Example playlists:
 
 ```text
 Window 1 — Lobby
@@ -1490,21 +870,15 @@ Window 4 — Corridor
 M6 → M3 → M2 → M4 → Blank
 ```
 
-The different playlists make it easy to verify that the windows are actually independent.
+This gives the application enough variation to test independent playback, videos, blank slots, playlist updates, and global synchronization.
 
 ---
 
 # API Reference
 
-All APIs use JSON for request and response bodies.
+All API endpoints are served by the Go backend.
 
-Time values are represented as Unix epoch milliseconds.
-
-Durations are represented internally in milliseconds.
-
-Some mutation APIs accept duration values in seconds because that is easier for the UI and API consumers.
-
----
+Time values are Unix epoch milliseconds.
 
 ## Health
 
@@ -1512,26 +886,14 @@ Some mutation APIs accept duration values in seconds because that is easier for 
 GET /api/health
 ```
 
-Returns service information including:
+Returns service information such as:
 
 ```text
 status
-uptime
 cycle duration
-connected SSE clients
 server time
-```
-
-Example:
-
-```json
-{
-  "status": "ok",
-  "cycleMs": 18000000,
-  "serverTimeMs": 1789466864364,
-  "sseClients": 0,
-  "uptimeSeconds": 31
-}
+SSE client count
+uptime
 ```
 
 ---
@@ -1542,55 +904,19 @@ Example:
 GET /api/time
 ```
 
-Returns the current backend time.
+Returns the current server timestamp.
 
-The frontend uses this endpoint for clock calibration.
-
-Example:
-
-```json
-{
-  "serverTimeMs": 1789466864364
-}
-```
+Used by the frontend for clock calibration.
 
 ---
 
-## Complete State
+## State
 
 ```http
 GET /api/state
 ```
 
-This is the main state endpoint.
-
-It provides the information required by the frontend to render the application.
-
-The response contains:
-
-```text
-serverTimeMs
-cycleMs
-cycleAnchorMs
-media
-windows
-activeSync
-playback
-```
-
-A simplified response looks like:
-
-```json
-{
-  "serverTimeMs": 1789466864364,
-  "cycleMs": 18000000,
-  "cycleAnchorMs": 1789466829807,
-  "media": [],
-  "windows": [],
-  "activeSync": null,
-  "playback": []
-}
-```
+Returns the complete application state.
 
 ---
 
@@ -1604,29 +930,7 @@ Returns the media library.
 
 ---
 
-## Windows
-
-```http
-GET /api/windows
-```
-
-Returns all display windows and their playlists.
-
----
-
-## Current Window Playback
-
-```http
-GET /api/windows/{id}/now
-```
-
-Returns what the server currently calculates for a specific window.
-
-The response can also provide the window's normal sequence separately from an active sync so the client can understand what the display will return to after the takeover.
-
----
-
-# Create Media
+## Create Media
 
 ```http
 POST /api/media
@@ -1651,13 +955,19 @@ video
 blank
 ```
 
-A URL is required for image and video media.
+---
 
-Blank media does not require a URL.
+## Windows
+
+```http
+GET /api/windows
+```
+
+Returns display windows and their playlists.
 
 ---
 
-# Create Window
+## Create Window
 
 ```http
 POST /api/windows
@@ -1671,11 +981,19 @@ Example:
 }
 ```
 
-A newly created window starts with an empty playlist.
+---
+
+## Current Window Playback
+
+```http
+GET /api/windows/{id}/now
+```
+
+Returns the current playback calculation for a window.
 
 ---
 
-# Add Playlist Item
+## Add Playlist Item
 
 ```http
 POST /api/windows/{id}/playlist
@@ -1690,29 +1008,23 @@ Example:
 }
 ```
 
-The duration can use the media's default duration when not explicitly supplied.
-
-A position can also be supplied when the caller wants to insert an item at a particular position.
-
 ---
 
-# Remove Playlist Item
+## Remove Playlist Item
 
 ```http
 DELETE /api/windows/{id}/playlist/{itemId}
 ```
 
-Returns:
+Successful deletion returns:
 
 ```text
 204 No Content
 ```
 
-when the item is successfully removed.
-
 ---
 
-# Start Sync
+## Start Sync
 
 ```http
 POST /api/sync
@@ -1727,57 +1039,37 @@ Example:
 }
 ```
 
-The backend calculates a future start time using the configured sync lead time.
-
-An exact future `startAtMs` can also be supplied when required.
-
-The response contains the scheduled sync information.
+The backend calculates a future start timestamp using the configured lead time.
 
 ---
 
-# Cancel Sync
+## Cancel Sync
 
 ```http
 DELETE /api/sync
 ```
 
-Cancels an armed or currently active sync takeover.
+Cancels the active or scheduled synchronization.
 
 ---
 
-# Reset Cycle
+## Reset Cycle
 
 ```http
 POST /api/cycle/reset
 ```
 
-Re-anchors the five-hour cycle to the current server time.
-
-After a cycle reset, windows start their timeline from the beginning of their playlists.
+Resets the shared cycle anchor.
 
 ---
 
-# Event Stream
+## SSE
 
 ```http
 GET /api/events
 ```
 
-This endpoint uses Server-Sent Events.
-
-Events include:
-
-```text
-snapshot
-playlist.updated
-sync.scheduled
-sync.cancelled
-media.created
-window.created
-cycle.reset
-```
-
-A newly connected client receives the current snapshot.
+Opens the real-time event stream.
 
 ---
 
@@ -1793,10 +1085,10 @@ Example:
 }
 ```
 
-Typical status codes include:
+Typical status codes:
 
 ```text
-200 → successful request
+200 → success
 201 → resource created
 204 → successful deletion
 400 → invalid request
@@ -1814,33 +1106,39 @@ Install:
 - Go 1.25+
 - Node.js
 - npm
-
-Docker is optional if you want to run the complete application in a container.
+- Docker (optional)
 
 ---
 
-# Run the Backend
+## Step 1 — Clone
 
-Open a terminal:
+```bash
+git clone https://github.com/VikasKumar281/SyncStage.git
+cd SyncStage
+```
+
+---
+
+## Step 2 — Start Backend
+
+Open terminal 1:
 
 ```bash
 cd backend
 go run ./cmd/server
 ```
 
-The backend normally listens on:
+Backend:
 
 ```text
 http://localhost:8080
 ```
 
-The backend reads its configuration from environment variables.
-
 ---
 
-# Run the Frontend
+## Step 3 — Start Frontend
 
-Open a second terminal:
+Open terminal 2:
 
 ```bash
 cd frontend
@@ -1848,190 +1146,151 @@ npm install
 npm run dev
 ```
 
-The frontend normally runs on:
+Frontend:
 
 ```text
 http://localhost:5173
 ```
 
-Vite proxies API requests to the backend during development.
+During development, Vite proxies API requests to the backend.
 
 ---
 
-# Local Development With PostgreSQL
+## Step 4 — Optional PostgreSQL
 
-If you want to use PostgreSQL locally, configure:
+Set:
 
 ```text
 DATABASE_URL=<your PostgreSQL connection string>
 ```
 
-Then run:
+Then:
 
 ```bash
 cd backend
 go run ./cmd/server
 ```
 
-The backend will use PostgreSQL instead of the local JSON fallback.
-
-The database table is created automatically.
+The backend will use PostgreSQL instead of JSON storage.
 
 ---
 
-# Local Development Without PostgreSQL
+## Step 5 — Run Without PostgreSQL
 
-For a simple local run, `DATABASE_URL` can be omitted.
+Simply leave `DATABASE_URL` unset.
 
-The backend then uses the JSON storage implementation.
+The backend uses:
 
-This is useful when working only on the frontend or scheduler logic without setting up a database.
+```text
+data/state.json
+```
+
+for local persistence.
 
 ---
 
 # Environment Variables
 
-## Backend Variables
-
 | Variable | Default | Description |
 |---|---:|---|
 | `PORT` | `8080` | HTTP server port |
 | `DATABASE_URL` | empty | PostgreSQL connection string |
-| `DATA_PATH` | `data/state.json` | Path used by local JSON storage |
+| `DATA_PATH` | `data/state.json` | Local JSON storage path |
 | `CYCLE_SECONDS` | `18000` | Five-hour cycle |
-| `SYNC_LEAD_MS` | `1200` | Time given to clients before sync starts |
+| `SYNC_LEAD_MS` | `1200` | Lead time before sync starts |
 | `SYNC_DEFAULT_SECONDS` | `10` | Default sync duration |
 | `ALLOWED_ORIGINS` | `*` | Allowed browser origins |
-| `STATIC_DIR` | empty | Directory containing React production files |
+| `STATIC_DIR` | empty | React production directory |
 
----
+## Five-Hour Cycle
 
-# Five-Hour Cycle Configuration
-
-The normal production value is:
+Production:
 
 ```text
 CYCLE_SECONDS=18000
 ```
 
-because:
-
-```text
-18000 seconds
-=
-5 hours
-```
-
-For local testing, the cycle can be reduced.
-
-For example:
+For fast local testing:
 
 ```text
 CYCLE_SECONDS=120
 ```
 
-creates a two-minute cycle.
+This creates a two-minute cycle while preserving the same timeline behavior.
 
-This is useful for testing cycle boundaries without waiting five hours.
+## Sync Configuration
 
-The actual timeline behavior remains the same.
-
----
-
-# Sync Configuration
-
-The default sync lead time is:
+Default lead time:
 
 ```text
 SYNC_LEAD_MS=1200
 ```
 
-This means the server normally schedules a sync approximately 1.2 seconds in the future.
-
-The default sync duration is:
+Default duration:
 
 ```text
 SYNC_DEFAULT_SECONDS=10
 ```
 
-The UI allows the operator to configure the sync duration.
+The UI can configure the actual synchronization duration.
 
----
-
-# Frontend Configuration
-
-The main frontend configuration is:
+## Frontend Configuration
 
 ```text
 VITE_API_BASE_URL
 ```
 
-When the frontend and backend are deployed separately, this can point to the backend URL.
-
-For the current single-container deployment, the value is left empty so the browser uses the same origin.
+For the current single-container deployment this can remain empty so the browser uses the same origin.
 
 ---
 
-# Running With Docker
+# Docker
 
-The project contains:
+The main production Dockerfile is:
 
 ```text
 Dockerfile.allinone
 ```
 
-This Dockerfile builds both the frontend and backend.
+It uses multiple build stages.
 
-The build has three main stages.
-
----
-
-## Stage 1 — Frontend Build
-
-The Docker build uses Node to:
+## Stage 1 — Frontend
 
 ```text
-install frontend dependencies
-       ↓
-build React application
-       ↓
-create frontend/dist
+Node
+  ↓
+npm install
+  ↓
+npm run build
+  ↓
+frontend/dist
 ```
 
-The result is the production React build.
-
----
-
-## Stage 2 — Backend Build
-
-The Docker build uses Go to:
+## Stage 2 — Backend
 
 ```text
-download Go dependencies
-       ↓
-copy backend source
-       ↓
+Go
+  ↓
+download dependencies
+  ↓
 go vet ./...
-       ↓
+  ↓
 go test ./...
-       ↓
-build Go server
+  ↓
+build server
 ```
 
-This means the Docker build also performs backend validation.
-
----
-
-## Stage 3 — Final Runtime Image
+## Stage 3 — Runtime
 
 The final image contains:
 
 ```text
 Go server
 React production build
+Bundled video files
 ```
 
-The final runtime image is kept separate from the build environments so the final container does not need Node or the Go compiler.
+Node and the Go compiler are not required in the final runtime image.
 
 ---
 
@@ -2047,53 +1306,79 @@ docker build -f Dockerfile.allinone -t syncstage .
 
 # Run Docker Container
 
+Standard:
+
 ```bash
-docker run -p 8080:8080 syncstage
+docker run --rm -p 8080:8080 syncstage
 ```
 
-Then open:
+Open:
 
 ```text
 http://localhost:8080
 ```
 
-The Go server serves both:
+If port `8080` is already occupied:
 
-```text
-/api/*
+```bash
+docker run --rm -p 8081:8080 syncstage
 ```
 
-and:
+Open:
 
 ```text
-React frontend
+http://localhost:8081
 ```
 
-from the same container.
+---
+
+# Verify Bundled Videos
+
+With the application running on port 8080:
+
+```text
+http://localhost:8080/videos/m4.mp4
+http://localhost:8080/videos/m5.mp4
+```
+
+With port 8081:
+
+```text
+http://localhost:8081/videos/m4.mp4
+http://localhost:8081/videos/m5.mp4
+```
+
+The browser may request video ranges and receive:
+
+```text
+206 Partial Content
+```
+
+which is expected for media range requests.
 
 ---
 
 # Docker Compose
 
-The repository also includes:
+The repository also contains:
 
 ```text
 docker-compose.yml
 ```
 
-Run:
+Start:
 
 ```bash
 docker compose up --build
 ```
 
-Then open:
+Open:
 
 ```text
 http://localhost:8080
 ```
 
-To stop:
+Stop:
 
 ```bash
 docker compose down
@@ -2103,7 +1388,7 @@ docker compose down
 
 # Production Deployment
 
-The current production deployment uses:
+Current deployment:
 
 ```text
 GitHub
@@ -2117,7 +1402,7 @@ SyncStage
 Neon PostgreSQL
 ```
 
-The deployed service is:
+Live application:
 
 ```text
 https://syncstage.onrender.com
@@ -2133,7 +1418,7 @@ The repository contains:
 render.yaml
 ```
 
-The important configuration is:
+Important configuration:
 
 ```yaml
 services:
@@ -2156,13 +1441,39 @@ services:
         value: "*"
 ```
 
-The Render service uses:
+The production `DATABASE_URL` is configured in Render and points to the Neon PostgreSQL database.
+
+Never commit the database connection string to Git.
+
+---
+
+# Production Deployment Flow
 
 ```text
-Dockerfile.allinone
+Developer pushes code
+        ↓
+GitHub
+        ↓
+Render detects commit
+        ↓
+Docker build
+        ↓
+React build
+        ↓
+Go vet
+        ↓
+Go tests
+        ↓
+Go production build
+        ↓
+Final Docker image
+        ↓
+Render Web Service
+        ↓
+SyncStage
+        ↓
+Neon PostgreSQL
 ```
-
-as the production Dockerfile.
 
 ---
 
@@ -2170,85 +1481,25 @@ as the production Dockerfile.
 
 Render uses:
 
-```text
-/api/health
+```http
+GET /api/health
 ```
 
-as the health check endpoint.
-
-The backend returns a successful response when the service is running correctly.
-
-Example:
+A healthy service returns a response containing:
 
 ```json
 {
-  "status": "ok",
-  "cycleMs": 18000000,
-  "serverTimeMs": 1789466864364,
-  "sseClients": 0,
-  "uptimeSeconds": 31
+  "status": "ok"
 }
 ```
 
----
-
-# Neon PostgreSQL
-
-The production database is hosted using Neon PostgreSQL.
-
-The connection string is configured through:
-
-```text
-DATABASE_URL
-```
-
-The database connection string should be stored as an environment variable and should not be committed to the repository.
-
-The backend creates the required database table automatically.
-
----
-
-# Production Deployment Flow
-
-The production deployment works like this:
-
-```text
-Developer pushes code
-        │
-        ▼
-GitHub repository
-        │
-        ▼
-Render detects commit
-        │
-        ▼
-Docker build
-        │
-        ├── React build
-        ├── Go tests
-        ├── go vet
-        └── Go production build
-        │
-        ▼
-Final Docker image
-        │
-        ▼
-Render Web Service
-        │
-        ├── React frontend
-        └── Go backend
-                │
-                ▼
-        Neon PostgreSQL
-```
+along with additional service information.
 
 ---
 
 # Testing
 
-Testing focuses on the timeline and synchronization logic because these are the most important parts of the application.
-
-Run the backend tests with:
+Run backend validation:
 
 ```bash
 cd backend
@@ -2256,34 +1507,28 @@ go vet ./...
 go test ./... -count=1
 ```
 
----
+The tests cover important behavior including:
 
-# What the Tests Cover
-
-The backend test suite covers cases such as:
-
-- Playlist walking
-- Playlist looping
-- Five-hour cycle boundary
-- Boundary truncation
-- Clock-before-anchor handling
-- Sync override
-- Sync release
-- Expired sync
-- Playlist item addition
-- Playlist item deletion
-- Unknown media IDs
-- Unknown window IDs
-- Persistence
-- CORS preflight behavior
-
-The goal is to test both normal playback and the edge cases around time boundaries and sync.
+- playlist walking
+- playlist looping
+- five-hour cycle boundary
+- boundary truncation
+- clock-before-anchor behavior
+- sync override
+- sync release
+- expired sync
+- playlist item addition
+- playlist item deletion
+- unknown media IDs
+- unknown window IDs
+- persistence
+- CORS behavior
 
 ---
 
-# Go and JavaScript Timeline Parity
+# Timeline Parity
 
-The playback algorithm exists in two places:
+Playback logic exists in both:
 
 ```text
 Go:
@@ -2297,9 +1542,9 @@ JavaScript:
 frontend/src/lib/timeline.js
 ```
 
-This is necessary because the browser needs to calculate its own playback locally.
+The browser needs its own implementation because it must calculate playback locally.
 
-However, having two implementations creates a possible source of bugs.
+Having two implementations creates a potential divergence risk.
 
 For example:
 
@@ -2313,156 +1558,103 @@ M1
 
 would cause the backend and display to disagree.
 
-To catch this, the project contains:
+The project therefore includes a parity verification script:
 
 ```text
 frontend/scripts/verify-parity.mjs
 ```
 
----
-
-# Run Parity Verification
-
-Start the backend:
-
-```bash
-cd backend
-go run ./cmd/server
-```
-
-Then in another terminal:
+Run it against a running backend:
 
 ```bash
 cd frontend
 node scripts/verify-parity.mjs http://localhost:8080
 ```
 
-The script compares the backend's current playback result with the frontend timeline calculation.
-
-The expected result is that both implementations agree for every window.
-
 ---
 
 # Manual Verification
 
-The live application can be tested manually.
+## 1. Independent Playback
 
-Open:
+Open the application and verify that each window follows its own playlist.
 
-```text
-https://syncstage.onrender.com
-```
-
-The initial screen should show the seeded display windows.
-
----
-
-## Test 1 — Independent Playback
-
-Observe different windows.
-
-Each window should show its own media according to its own playlist.
-
-For example:
+Expected behavior:
 
 ```text
-Window 1 → M1
-Window 2 → M3
-Window 3 → M5
-Window 4 → M6
+Window 1 → its playlist
+Window 2 → its playlist
+Window 3 → its playlist
+Window 4 → its playlist
 ```
 
-The exact media depends on the current cycle position.
+---
 
-The important point is that the windows do not all follow the same playlist.
+## 2. Playlist Update
+
+1. Select a display.
+2. Add a media item.
+3. Confirm the playlist changes.
+4. Observe another connected display.
+5. Confirm the state update arrives without a full page reload.
 
 ---
 
-# Test 2 — Playlist Update
+## 3. Playlist Removal
 
-Choose a window.
-
-Add a media item.
-
-The playlist should update without requiring a page refresh.
-
-Open another display window and verify that the change is also reflected there.
+1. Select an existing playlist item.
+2. Remove it.
+3. Confirm it disappears.
+4. Confirm connected clients receive the updated state.
 
 ---
 
-# Test 3 — Playlist Removal
+## 4. Global Sync
 
-Remove an existing playlist item.
-
-The item should disappear from the playlist.
-
-Connected display windows should receive the updated state.
+1. Open multiple displays.
+2. Select sync media.
+3. Choose a duration.
+4. Start sync.
+5. Confirm all displays switch to the selected media.
+6. Confirm the sync state is visible.
 
 ---
 
-# Test 4 — Sync Takeover
+## 5. Sync Release
 
-Select a media item from:
+Wait for the selected duration.
+
+After sync expires:
 
 ```text
-Sync takeover
+Window 1 → normal sequence
+Window 2 → normal sequence
+Window 3 → normal sequence
+Window 4 → normal sequence
 ```
 
-Choose a duration.
+---
 
-Click:
+## 6. Detached Displays
 
-```text
-Sync all windows
-```
-
-All open windows should switch to the selected media.
-
-The display cards should also indicate that they are currently under sync.
+1. Open a display using `Detach`.
+2. Open multiple detached windows.
+3. Trigger sync from the control interface.
+4. Confirm all displays respond to the same scheduled synchronization.
 
 ---
 
-# Test 5 — Sync Release
+## 7. Persistence
 
-Wait for the configured sync duration.
+1. Modify a playlist.
+2. Refresh the application.
+3. Confirm the change remains.
 
-After the sync ends, each display should return to its own normal playlist.
-
-The windows should not all continue playing the synchronized media.
-
----
-
-# Test 6 — Detached Windows
-
-Click:
-
-```text
-Detach
-```
-
-on a window.
-
-A separate display should open.
-
-Repeat this for multiple windows.
-
-Then trigger a sync from the main control interface.
-
-This provides a more realistic synchronization test than displaying everything inside one page.
+In production this verifies PostgreSQL/Neon persistence.
 
 ---
 
-# Test 7 — Persistence
-
-Make a playlist change.
-
-Refresh the page.
-
-The changed playlist should still exist because the deployed version stores the state in PostgreSQL.
-
----
-
-# Test 8 — Health Endpoint
+## 8. Health
 
 Open:
 
@@ -2470,7 +1662,7 @@ Open:
 https://syncstage.onrender.com/api/health
 ```
 
-A successful deployment should return a JSON response containing:
+Confirm:
 
 ```text
 status = ok
@@ -2478,7 +1670,7 @@ status = ok
 
 ---
 
-# Test 9 — Server Time
+## 9. Server Time
 
 Open:
 
@@ -2486,21 +1678,15 @@ Open:
 https://syncstage.onrender.com/api/time
 ```
 
-The response should contain the current server timestamp.
-
-The frontend uses this endpoint for clock calibration.
+Confirm a server timestamp is returned.
 
 ---
 
-# Test 10 — Live Event Stream
+## 10. Bundled Videos
 
-The SSE endpoint is:
+Open the video URLs or observe M4/M5 in the application.
 
-```text
-https://syncstage.onrender.com/api/events
-```
-
-A connected client receives live application snapshots and events.
+Confirm that both videos load without depending on an external video host.
 
 ---
 
@@ -2508,15 +1694,7 @@ A connected client receives live application snapshots and events.
 
 ## 1. Time-Based Playback
 
-The main design decision was to make playback a function of time.
-
-Instead of:
-
-```text
-server sends "play next"
-```
-
-the application calculates:
+Playback is calculated from:
 
 ```text
 current time
@@ -2524,111 +1702,83 @@ current time
 cycle anchor
 +
 playlist
-=
-current media
 ```
 
-### Benefits
+Benefits:
 
-- A display does not depend on a server command for every media transition.
-- A refreshed browser can calculate its current position.
-- A newly opened display can calculate its current position.
-- Temporary network problems do not require the server to track every media transition.
-- The same timeline can be used for synchronization.
+- refresh recovery
+- late display joining
+- reduced network dependency
+- deterministic playback
+- natural synchronization support
 
-### Tradeoff
+Tradeoff:
 
-The timeline logic has to exist in both Go and JavaScript.
-
-That is why a parity test is included.
+The playback algorithm exists in both Go and JavaScript, so parity testing is important.
 
 ---
 
-# 2. Future-Timestamp Synchronization
+## 2. Future-Timestamp Synchronization
 
-Sync is represented as a scheduled event rather than an immediate command.
+Sync uses a scheduled future timestamp instead of an immediate command.
 
-### Benefits
+Benefits:
 
-- Clients have time to receive the sync event.
-- Every client targets the same server timestamp.
-- Network latency has less impact on the actual switching moment.
+- clients have time to receive the event
+- every client targets the same timestamp
+- normal network latency has less impact on the switching moment
 
-### Tradeoff
+Tradeoff:
 
-Synchronization can never be mathematically perfect on arbitrary networks.
-
-A client with a very slow or interrupted connection may not receive the event before the scheduled start.
-
-The sync lead time provides a reasonable buffer for normal connections.
+No software solution can guarantee mathematically perfect synchronization across arbitrary networks.
 
 ---
 
-# 3. Server Clock Calibration
+## 3. Server Clock Calibration
 
-Client system clocks are not guaranteed to match each other.
+The browser estimates its offset from the backend server clock.
 
-The application therefore estimates the difference between:
-
-```text
-client clock
-```
-
-and:
-
-```text
-server clock
-```
-
-and uses the adjusted time for timeline calculations.
+This prevents different client system clocks from directly determining sync timing.
 
 ---
 
-# 4. SSE Instead of WebSockets
+## 4. SSE Instead of WebSockets
 
-The application's real-time communication is mostly:
+Server-to-browser communication is the primary real-time requirement.
+
+SSE provides a simpler implementation for:
 
 ```text
-server → browser
+state updates
+playlist changes
+sync events
+cycle events
 ```
 
-while browser actions use REST.
-
-SSE is therefore simpler than introducing a full WebSocket protocol.
+while REST handles operator actions.
 
 ---
 
-# 5. PostgreSQL JSONB
+## 5. PostgreSQL JSONB
 
-The application state is a relatively small aggregate.
+The application state is a relatively small aggregate and does not require complex relational queries.
 
-There is no requirement for complex database queries.
-
-PostgreSQL JSONB provides persistence while keeping the storage implementation straightforward.
-
-The storage interface also keeps the application independent from the specific persistence implementation.
+JSONB provides a straightforward persistent representation.
 
 ---
 
-# 6. Single Container Deployment
+## 6. Single Container Deployment
 
-The React frontend and Go backend are deployed together.
+React and Go are deployed together.
 
-The production container contains:
+Benefits:
 
-```text
-React build
-+
-Go server
-```
-
-This keeps deployment simple and means the browser can use one origin for:
-
-```text
-frontend
-API
-SSE
-```
+- simple deployment
+- one public origin
+- simple frontend/API routing
+- simple SSE routing
+- bundled demo videos
+- fewer production services
 
 ---
 
@@ -2636,67 +1786,49 @@ SSE
 
 ## Five Hours Is a Repeating Cycle
 
-The five-hour period is treated as a cycle, not as a total lifetime for a playlist.
-
-After five hours:
+The five-hour period is a repeating cycle:
 
 ```text
 Cycle 0
-   ↓
+  ↓
 Cycle 1
-   ↓
+  ↓
 Cycle 2
-   ↓
+  ↓
 ...
 ```
 
 Playback continues indefinitely.
 
----
-
 ## Cycle Boundary Truncates the Current Item
 
-If an item crosses the five-hour boundary, it is truncated at the boundary.
+If an item crosses the five-hour boundary, it is truncated.
 
-The next cycle begins from the first playlist item.
-
----
+The next cycle starts from playlist item zero.
 
 ## Blank Is Explicit
 
-Blank media appears only when a blank item is explicitly included in a playlist.
+Blank playback occurs only when a blank item is explicitly included.
 
-Unused time is not automatically converted to blank playback.
+Unused cycle time is not automatically converted into blank playback.
 
----
+## Sync Media Is Independent of Normal Playlists
 
-## Sync Media Does Not Need to Be in Every Playlist
-
-A sync takeover uses a media item from the media library.
-
-The media does not have to exist in every window's normal playlist.
-
-The sync is a temporary global override.
-
----
+A sync media item does not have to be present in every window's normal playlist.
 
 ## Normal Playback Continues Under Sync
 
-The normal sequence is not replaced by the sync state.
+Sync is a temporary display override.
 
-The sync only changes what is currently displayed.
+The normal timeline remains logically time-based underneath it.
 
-After sync expiration, the normal timeline is resolved again.
+## Media Uses URLs
 
----
+Media is represented using metadata and a URL.
 
-## Media Is Referenced by URL
+The application does not implement a full media upload/transcoding pipeline.
 
-The application stores media metadata and URLs.
-
-It does not implement a complete media upload/transcoding pipeline.
-
-External image and video URLs can therefore be used for the seeded data.
+The seeded demo videos are bundled locally for reliable demonstration.
 
 ---
 
@@ -2704,68 +1836,57 @@ External image and video URLs can therefore be used for the seeded data.
 
 ## Single Backend Instance
 
-The current architecture is intended for a single backend instance.
+The current architecture is designed for a single backend instance.
 
-The in-memory SSE connection hub is local to that backend process.
+The SSE connection hub is stored in memory.
 
-If the application were scaled horizontally to multiple backend instances, a shared event broker or distributed messaging system would be needed so that a state update from one instance reaches clients connected to another instance.
+Horizontal scaling would require a shared event broker or distributed messaging layer.
 
----
+## External User Media
 
-## External Media Availability
-
-Images and videos are loaded from their configured URLs.
+User-created media may reference external URLs.
 
 If an external media host is unavailable, the browser cannot display that media.
 
-The application does not currently download and cache all external media.
+The application does not currently download and cache all external user media.
 
----
+## Browser Autoplay Policies
 
-## Browser Autoplay Rules
+Videos are muted and played inline to support normal browser autoplay restrictions.
 
-Videos are muted and played inline to work with browser autoplay restrictions.
-
-Browsers can still apply their own playback policies.
-
----
+Browsers may still apply their own policies.
 
 ## Network Conditions
 
-The timestamp-based sync design improves synchronization but does not eliminate network limitations.
+Timestamp-based synchronization reduces the effect of latency but cannot eliminate network failures.
 
-A display with a severe network delay may not receive the sync event before the scheduled start.
-
----
+A severely delayed client may receive a sync event after its scheduled start.
 
 ## Media Upload
 
-The current implementation does not provide a full media upload pipeline.
-
-Media is represented by metadata and a URL.
+There is currently no complete upload, validation, storage, or transcoding pipeline for user media.
 
 ---
 
 # Future Improvements
 
-Some improvements that could be added in a larger production version include:
+Possible production-scale improvements include:
 
-- Authentication and role-based operator access
+- Authentication and role-based access
 - Media upload and object storage
-- Media validation before adding URLs
-- Distributed SSE/event broker for multiple backend instances
+- Media validation
+- Distributed SSE/event broker
 - Redis or another shared event system
-- More detailed playback diagnostics
 - Display health monitoring
 - Offline media caching
-- Better handling of unavailable media
-- Playlist drag-and-drop ordering
-- Scheduling sync events for future dates
-- Audit logs for operator actions
+- Better unavailable-media handling
+- Drag-and-drop playlist ordering
+- Scheduled future sync events
+- Audit logs
 - Persistent per-display configuration
-- More detailed monitoring and metrics
-- Automated end-to-end browser tests
-- Better media management UI
+- Detailed monitoring and metrics
+- Automated browser end-to-end tests
+- Richer media management UI
 
 These are outside the core scope of the current implementation.
 
@@ -2774,8 +1895,6 @@ These are outside the core scope of the current implementation.
 # Useful Commands
 
 ## Backend
-
-Run:
 
 ```bash
 cd backend
@@ -2788,7 +1907,7 @@ Format:
 gofmt -w .
 ```
 
-Check:
+Validate:
 
 ```bash
 go vet ./...
@@ -2800,8 +1919,6 @@ Test:
 go test ./... -count=1
 ```
 
----
-
 ## Frontend
 
 Install:
@@ -2811,7 +1928,7 @@ cd frontend
 npm install
 ```
 
-Development server:
+Development:
 
 ```bash
 npm run dev
@@ -2822,8 +1939,6 @@ Production build:
 ```bash
 npm run build
 ```
-
----
 
 ## Docker
 
@@ -2836,16 +1951,22 @@ docker build -f Dockerfile.allinone -t syncstage .
 Run:
 
 ```bash
-docker run -p 8080:8080 syncstage
+docker run --rm -p 8080:8080 syncstage
 ```
 
-Compose:
+Alternative:
+
+```bash
+docker run --rm -p 8081:8080 syncstage
+```
+
+## Docker Compose
 
 ```bash
 docker compose up --build
 ```
 
-Stop Compose:
+Stop:
 
 ```bash
 docker compose down
@@ -2891,7 +2012,7 @@ Current Window 1 playback:
 curl http://localhost:8080/api/windows/w1/now
 ```
 
-SSE stream:
+SSE:
 
 ```bash
 curl -N http://localhost:8080/api/events
@@ -2904,9 +2025,7 @@ curl -N http://localhost:8080/api/events
 Start an 8-second sync:
 
 ```bash
-curl -X POST http://localhost:8080/api/sync \
-  -H "Content-Type: application/json" \
-  -d "{\"mediaId\":\"m2\",\"durationSeconds\":8}"
+curl -X POST http://localhost:8080/api/sync   -H "Content-Type: application/json"   -d "{"mediaId":"m2","durationSeconds":8}"
 ```
 
 Then inspect:
@@ -2915,102 +2034,110 @@ Then inspect:
 curl http://localhost:8080/api/state
 ```
 
-During the sync, the playback source should be:
+During synchronization, affected playback should report the sync source.
 
-```text
-sync
-```
-
-for the affected windows.
-
-After the sync expires, the source returns to:
-
-```text
-sequence
-```
+After the sync expires, playback should return to the normal sequence.
 
 ---
 
-# Example Playlist Update
+# Submission Checklist
 
-Add M2 to Window 1:
+Before submitting the assignment:
 
-```bash
-curl -X POST http://localhost:8080/api/windows/w1/playlist \
-  -H "Content-Type: application/json" \
-  -d "{\"mediaId\":\"m2\",\"durationSeconds\":8}"
-```
-
-The backend persists the change and connected clients receive the updated state through SSE.
-
----
-
-# Project Goals
-
-The main goals of SyncStage are:
-
-```text
-Independent display playback
-            +
-Accurate time-based sequencing
-            +
-Reliable synchronized takeover
-            +
-Live playlist updates
-            +
-Persistent state
-            +
-Simple deployment
-```
-
-The project intentionally keeps the architecture relatively small while handling the important edge cases around:
-
-- five-hour cycle boundaries
-- playlist looping
-- temporary synchronization
-- client clock differences
-- live state updates
-- persistence
-- browser refreshes
-- video timeline positioning
+- [ ] GitHub repository is public
+- [ ] README is present
+- [ ] Live Render URL works
+- [ ] `/api/health` returns `status: ok`
+- [ ] Frontend loads
+- [ ] All display windows render
+- [ ] Images render
+- [ ] M4 video renders
+- [ ] M5 video renders
+- [ ] Playlist add works
+- [ ] Playlist delete works
+- [ ] SSE connection works
+- [ ] Global sync works
+- [ ] Sync release works
+- [ ] Detached displays work
+- [ ] Playlist changes persist after refresh
+- [ ] Production uses PostgreSQL/Neon
+- [ ] No database secrets are committed
+- [ ] `go vet ./...` passes
+- [ ] `go test ./... -count=1` passes
+- [ ] Frontend production build passes
+- [ ] Docker image builds successfully
+- [ ] Docker container serves frontend and videos
 
 ---
 
-# Summary
+# Final Architecture Summary
 
-SyncStage is a multi-window media sequencing application built with:
-
-```text
-React
-   +
-Go
-   +
-PostgreSQL
-   +
-Server-Sent Events
-   +
-Docker
-```
-
-The most important design choice is that playback is **time-derived** rather than controlled entirely through sequential server commands.
-
-The synchronization feature builds on the same idea by scheduling a future timestamp and allowing every client to target that timestamp using a calibrated server clock.
-
-This allows:
+The core playback flow is:
 
 ```text
-Window 1 ─┐
-Window 2 ─┤
-Window 3 ─┼──→ synchronized media at one scheduled instant
-Window 4 ─┘
+                  Shared Server Time
+                         │
+                         ▼
+                Five-Hour Cycle
+                         │
+                         ▼
+                  Window Playlist
+                         │
+                         ▼
+                  resolve(...)
+                         │
+                         ▼
+                  Current Media
+                         │
+                         ▼
+                   MediaSurface
 ```
 
-while still allowing every window to maintain its own independent playlist.
+The synchronization flow is:
 
-The application is available here:
+```text
+Operator
+   │
+   │ Start Sync
+   ▼
+Go Backend
+   │
+   │ Calculate future startAtMs
+   ▼
+SSE Broadcast
+   │
+   ├──────────┬──────────┬──────────┐
+   ▼          ▼          ▼          ▼
+Window 1   Window 2   Window 3   Window 4
+   │          │          │          │
+   └──────────┴──────────┴──────────┘
+                    │
+                    ▼
+            Same server timestamp
+                    │
+                    ▼
+              Sync takeover
+                    │
+                    ▼
+            Normal timelines resume
+```
 
-**Live Demo:**  
-https://syncstage.onrender.com
+SyncStage therefore combines:
 
-**GitHub:**  
-https://github.com/VikasKumar281/SyncStage
+```text
+Deterministic playback
+        +
+Independent playlists
+        +
+Real-time state updates
+        +
+Server-clock calibration
+        +
+Future-timestamp synchronization
+        +
+Persistent storage
+        +
+Single-container deployment
+```
+
+to provide a practical multi-display media sequencing system.
