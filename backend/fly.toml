@@ -4,7 +4,7 @@
 #   fly volumes create sequencer_data --size 1
 #   fly deploy
 
-app = "media-sequencer-api"
+app = "SyncStage-api"
 primary_region = "sin"
 
 [build]

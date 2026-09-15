@@ -11,7 +11,6 @@ type Event struct {
 	Data []byte
 }
 
-
 type Hub struct {
 	mu          sync.RWMutex
 	subscribers map[chan Event]struct{}
@@ -20,7 +19,6 @@ type Hub struct {
 func NewHub() *Hub {
 	return &Hub{subscribers: make(map[chan Event]struct{})}
 }
-
 
 func (h *Hub) Subscribe() (chan Event, func()) {
 	ch := make(chan Event, 16)
@@ -47,7 +45,6 @@ func (h *Hub) Subscribe() (chan Event, func()) {
 	}
 	return ch, unsubscribe
 }
-
 
 func (h *Hub) Broadcast(name string, payload any) {
 	data, err := json.Marshal(payload)

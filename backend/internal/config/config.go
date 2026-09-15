@@ -1,4 +1,3 @@
-
 package config
 
 import (
@@ -10,21 +9,19 @@ import (
 )
 
 type Config struct {
-
 	Port string
 
 	DataPath string
 
-	CycleMs int64
+	DatabaseURL string
 
+	CycleMs int64
 
 	SyncLeadMs int64
 
 	DefaultSyncDurationMs int64
 
-
 	AllowedOrigins []string
-
 
 	StaticDir string
 }
@@ -33,6 +30,7 @@ func Load() Config {
 	cfg := Config{
 		Port:                  getString("PORT", "8080"),
 		DataPath:              getString("DATA_PATH", "data/state.json"),
+		DatabaseURL:           getString("DATABASE_URL", ""),
 		CycleMs:               int64(getInt("CYCLE_SECONDS", 5*60*60)) * 1000,
 		SyncLeadMs:            int64(getInt("SYNC_LEAD_MS", 1200)),
 		DefaultSyncDurationMs: int64(getInt("SYNC_DEFAULT_SECONDS", 10)) * 1000,

@@ -1,4 +1,3 @@
-
 package models
 
 import "errors"
@@ -20,14 +19,13 @@ func (m MediaType) Valid() bool {
 	return false
 }
 
-
 type Media struct {
-	ID string `json:"id"`
-	Name string    `json:"name"`
-	Type MediaType `json:"type"`
-	URL string `json:"url"`
-	DefaultDurationMs int64 `json:"defaultDurationMs"`
-	CreatedAtMs       int64 `json:"createdAtMs"`
+	ID                string    `json:"id"`
+	Name              string    `json:"name"`
+	Type              MediaType `json:"type"`
+	URL               string    `json:"url"`
+	DefaultDurationMs int64     `json:"defaultDurationMs"`
+	CreatedAtMs       int64     `json:"createdAtMs"`
 }
 
 func (m *Media) Validate() error {
@@ -45,7 +43,6 @@ func (m *Media) Validate() error {
 	}
 	return nil
 }
-
 
 type PlaylistItem struct {
 	ID         string `json:"id"`
@@ -67,13 +64,12 @@ func (w *Window) PlaylistDurationMs() int64 {
 	return total
 }
 
-
 type SyncEvent struct {
-	ID         string `json:"id"`
-	MediaID    string `json:"mediaId"`
-	StartAtMs  int64  `json:"startAtMs"`
-	DurationMs int64  `json:"durationMs"`
-	TriggeredAtMs int64 `json:"triggeredAtMs"`
+	ID            string `json:"id"`
+	MediaID       string `json:"mediaId"`
+	StartAtMs     int64  `json:"startAtMs"`
+	DurationMs    int64  `json:"durationMs"`
+	TriggeredAtMs int64  `json:"triggeredAtMs"`
 }
 
 func (s *SyncEvent) EndsAtMs() int64 { return s.StartAtMs + s.DurationMs }

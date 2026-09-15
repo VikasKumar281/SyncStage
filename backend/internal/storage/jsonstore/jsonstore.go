@@ -1,4 +1,3 @@
-
 package jsonstore
 
 import (
@@ -8,7 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/vikas/media-sequencer/backend/internal/models"
+	"github.com/VikasKumar281/SyncStage/backend/internal/models"
 )
 
 type Store struct {
@@ -16,7 +15,6 @@ type Store struct {
 	path  string
 	state *models.State
 }
-
 
 func Open(path string, defaultState func() *models.State) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -51,7 +49,6 @@ func (s *Store) Load() (*models.State, error) {
 	return s.state.Clone(), nil
 }
 
-
 func (s *Store) Update(mutate func(*models.State) error) (*models.State, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -82,7 +79,7 @@ func (s *Store) persistLocked() error {
 		return fmt.Errorf("jsonstore: create temp file: %w", err)
 	}
 	tmpName := tmp.Name()
-	defer os.Remove(tmpName) 
+	defer os.Remove(tmpName)
 
 	if _, err := tmp.Write(raw); err != nil {
 		tmp.Close()

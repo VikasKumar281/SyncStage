@@ -1,6 +1,6 @@
 package scheduler
 
-import "github.com/vikas/media-sequencer/backend/internal/models"
+import "github.com/VikasKumar281/SyncStage/backend/internal/models"
 
 const DefaultCycleMs int64 = 5 * 60 * 60 * 1000
 
@@ -8,23 +8,23 @@ type Source string
 
 const (
 	SourceSequence Source = "sequence"
-	SourceSync Source = "sync"
+	SourceSync     Source = "sync"
 
 	SourceIdle Source = "idle"
 )
 
 type Playback struct {
-	WindowID string `json:"windowId"`
-	Source   Source `json:"source"`
-	MediaID  string `json:"mediaId"`
-	ItemID   string `json:"itemId"`
-	ItemIndex int `json:"itemIndex"`
-	StartedAtMs int64 `json:"startedAtMs"`
-	EndsAtMs    int64 `json:"endsAtMs"`
-	RemainingMs int64 `json:"remainingMs"`
-	CycleIndex int64 `json:"cycleIndex"`
-	OffsetInCycleMs int64 `json:"offsetInCycleMs"`
-	Media *models.Media `json:"media"`
+	WindowID        string        `json:"windowId"`
+	Source          Source        `json:"source"`
+	MediaID         string        `json:"mediaId"`
+	ItemID          string        `json:"itemId"`
+	ItemIndex       int           `json:"itemIndex"`
+	StartedAtMs     int64         `json:"startedAtMs"`
+	EndsAtMs        int64         `json:"endsAtMs"`
+	RemainingMs     int64         `json:"remainingMs"`
+	CycleIndex      int64         `json:"cycleIndex"`
+	OffsetInCycleMs int64         `json:"offsetInCycleMs"`
+	Media           *models.Media `json:"media"`
 }
 
 type Timeline struct {
@@ -33,14 +33,12 @@ type Timeline struct {
 
 func New() *Timeline { return &Timeline{CycleMs: DefaultCycleMs} }
 
-
 func NewWithCycle(cycleMs int64) *Timeline {
 	if cycleMs <= 0 {
 		cycleMs = DefaultCycleMs
 	}
 	return &Timeline{CycleMs: cycleMs}
 }
-
 
 func floorMod(a, m int64) int64 {
 	if m <= 0 {
@@ -64,7 +62,6 @@ func floorDiv(a, m int64) int64 {
 	return q
 }
 
-
 func (t *Timeline) Resolve(state *models.State, w *models.Window, nowMs int64) Playback {
 	if state.ActiveSync.IsActiveAt(nowMs) {
 		s := state.ActiveSync
@@ -86,7 +83,6 @@ func (t *Timeline) Resolve(state *models.State, w *models.Window, nowMs int64) P
 	}
 	return t.ResolveSequence(state, w, nowMs)
 }
-
 
 func (t *Timeline) ResolveSequence(state *models.State, w *models.Window, nowMs int64) Playback {
 	cycleIndex, offset := t.cyclePosition(state.CycleAnchorMs, nowMs)

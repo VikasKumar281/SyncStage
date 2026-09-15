@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-
 func withCORS(allowed []string, next http.Handler) http.Handler {
 	allowAny := false
 	set := make(map[string]struct{}, len(allowed))
@@ -53,7 +52,6 @@ func (s *statusRecorder) WriteHeader(code int) {
 	s.status = code
 	s.ResponseWriter.WriteHeader(code)
 }
-
 
 func (s *statusRecorder) Flush() {
 	if f, ok := s.ResponseWriter.(http.Flusher); ok {

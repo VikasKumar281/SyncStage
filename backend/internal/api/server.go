@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vikas/media-sequencer/backend/internal/config"
-	"github.com/vikas/media-sequencer/backend/internal/models"
-	"github.com/vikas/media-sequencer/backend/internal/scheduler"
-	"github.com/vikas/media-sequencer/backend/internal/storage"
+	"github.com/VikasKumar281/SyncStage/backend/internal/config"
+	"github.com/VikasKumar281/SyncStage/backend/internal/models"
+	"github.com/VikasKumar281/SyncStage/backend/internal/scheduler"
+	"github.com/VikasKumar281/SyncStage/backend/internal/storage"
 )
 
 type Server struct {
@@ -25,7 +25,7 @@ type Server struct {
 	timeline *scheduler.Timeline
 	hub      *Hub
 	started  time.Time
-	now func() time.Time
+	now      func() time.Time
 }
 
 func NewServer(cfg config.Config, store storage.Store) *Server {
@@ -69,7 +69,6 @@ func (s *Server) Handler() http.Handler {
 	return withRecovery(withLogging(withCORS(s.cfg.AllowedOrigins, mux)))
 }
 
-
 func (s *Server) mountStatic(mux *http.ServeMux) {
 	if s.cfg.StaticDir == "" {
 		mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +77,7 @@ func (s *Server) mountStatic(mux *http.ServeMux) {
 				return
 			}
 			writeJSON(w, http.StatusOK, map[string]string{
-				"service": "media-sequencer-backend",
+				"service": "SyncStage",
 				"docs":    "GET /api/state to begin; see README.md for the full API",
 			})
 		})
@@ -100,7 +99,6 @@ func (s *Server) mountStatic(mux *http.ServeMux) {
 		fileServer.ServeHTTP(w, r)
 	})
 }
-
 
 type snapshot struct {
 	ServerTimeMs  int64                `json:"serverTimeMs"`
@@ -135,7 +133,6 @@ func (s *Server) snapshotOf(state *models.State) snapshot {
 	}
 }
 
-
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":        "ok",
@@ -145,7 +142,6 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"cycleMs":       s.cfg.CycleMs,
 	})
 }
-
 
 func (s *Server) handleTime(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]int64{"serverTimeMs": s.nowMs()})
@@ -424,7 +420,7 @@ func (s *Server) handleTriggerSync(w http.ResponseWriter, r *http.Request) {
 		if _, ok := st.FindMedia(event.MediaID); !ok {
 			return fmt.Errorf("%w: media %q", storage.ErrNotFound, event.MediaID)
 		}
-	
+
 		st.ActiveSync = &event
 		return nil
 	})
@@ -465,7 +461,6 @@ func (s *Server) handleResetCycle(w http.ResponseWriter, r *http.Request) {
 	s.broadcastState(state, "cycle.reset")
 	writeJSON(w, http.StatusOK, s.snapshotOf(state))
 }
-
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
@@ -524,7 +519,6 @@ func writeSSE(w http.ResponseWriter, name string, data []byte) {
 	fmt.Fprintf(w, "data: %s\n\n", data)
 }
 
-
 func decodeJSON(r *http.Request, dst any) error {
 	if r.Body == nil {
 		return errors.New("request body is required")
@@ -556,7 +550,6 @@ func writeDomainError(w http.ResponseWriter, err error) {
 	}
 	writeError(w, http.StatusBadRequest, err)
 }
-
 
 func newID(prefix string) string {
 	buf := make([]byte, 6)

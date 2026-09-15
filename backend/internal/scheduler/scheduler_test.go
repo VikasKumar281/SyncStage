@@ -3,7 +3,7 @@ package scheduler
 import (
 	"testing"
 
-	"github.com/vikas/media-sequencer/backend/internal/models"
+	"github.com/VikasKumar281/SyncStage/backend/internal/models"
 )
 
 func testState() *models.State {

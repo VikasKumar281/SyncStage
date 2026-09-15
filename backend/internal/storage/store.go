@@ -3,7 +3,7 @@ package storage
 import (
 	"errors"
 
-	"github.com/vikas/media-sequencer/backend/internal/models"
+	"github.com/VikasKumar281/SyncStage/backend/internal/models"
 )
 
 var ErrNotFound = errors.New("not found")

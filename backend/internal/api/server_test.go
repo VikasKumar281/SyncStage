@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vikas/media-sequencer/backend/internal/config"
-	"github.com/vikas/media-sequencer/backend/internal/models"
-	"github.com/vikas/media-sequencer/backend/internal/seed"
-	"github.com/vikas/media-sequencer/backend/internal/storage/jsonstore"
+	"github.com/VikasKumar281/SyncStage/backend/internal/config"
+	"github.com/VikasKumar281/SyncStage/backend/internal/models"
+	"github.com/VikasKumar281/SyncStage/backend/internal/seed"
+	"github.com/VikasKumar281/SyncStage/backend/internal/storage/jsonstore"
 )
 
 func newTestServer(t *testing.T) (http.Handler, *Server) {

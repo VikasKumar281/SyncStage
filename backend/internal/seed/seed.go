@@ -1,16 +1,14 @@
-
 package seed
 
 import (
 	"time"
 
-	"github.com/vikas/media-sequencer/backend/internal/models"
+	"github.com/VikasKumar281/SyncStage/backend/internal/models"
 )
 
 const (
 	sec = int64(1000)
 )
-
 
 const (
 	M1    = "m1"
