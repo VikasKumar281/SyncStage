@@ -41,12 +41,12 @@ func Default(now time.Time) *models.State {
 		},
 		{
 			ID: M4, Name: "M4 (video)", Type: models.MediaVideo,
-			URL:               "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+			URL:               "/videos/m4.mp4",
 			DefaultDurationMs: 15 * sec, CreatedAtMs: nowMs,
 		},
 		{
 			ID: M5, Name: "M5 (video)", Type: models.MediaVideo,
-			URL:               "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+			URL:               "/videos/m5.mp4",
 			DefaultDurationMs: 15 * sec, CreatedAtMs: nowMs,
 		},
 		{
@@ -55,7 +55,6 @@ func Default(now time.Time) *models.State {
 			DefaultDurationMs: 10 * sec, CreatedAtMs: nowMs,
 		},
 		{
-
 			ID: Blank, Name: "Blank", Type: models.MediaBlank,
 			DefaultDurationMs: 5 * sec, CreatedAtMs: nowMs,
 		},

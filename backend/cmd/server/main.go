@@ -19,6 +19,25 @@ import (
 	"github.com/VikasKumar281/SyncStage/backend/internal/storage/pgstore"
 )
 
+func migrateVideoURLs(store storage.Store) error {
+    const m4URL = "/videos/m4.mp4"
+    const m5URL = "/videos/m5.mp4"
+
+	_, err := store.Update(func(state *models.State) error {
+		if media, ok := state.FindMedia(seed.M4); ok {
+			media.URL = m4URL
+		}
+
+		if media, ok := state.FindMedia(seed.M5); ok {
+			media.URL = m5URL
+		}
+
+		return nil
+	})
+
+	return err
+}
+
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
 	log.SetPrefix("[sequencer] ")
@@ -39,6 +58,12 @@ func main() {
 		}
 
 		store = pgStore
+
+		if err := migrateVideoURLs(store); err != nil {
+			log.Fatalf("video URL migration: %v", err)
+		}
+
+		log.Println("video URLs migrated successfully")
 	} else {
 		log.Println("DATABASE_URL not set, using JSON file storage")
 
@@ -73,7 +98,8 @@ func main() {
 			log.Printf("serving built frontend from %s", cfg.StaticDir)
 		}
 
-		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := httpServer.ListenAndServe(); err != nil &&
+			!errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("http server: %v", err)
 		}
 	}()
