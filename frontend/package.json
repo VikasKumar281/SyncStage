@@ -1,0 +1,21 @@
+{
+  "name": "media-sequencer-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Multi-window media sequencer with synchronised playback",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "parity": "node scripts/verify-parity.mjs"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.8"
+  }
+}

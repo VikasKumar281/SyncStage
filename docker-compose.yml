@@ -1,0 +1,22 @@
+
+
+services:
+  sequencer:
+    build:
+      context: .
+      dockerfile: Dockerfile.allinone
+    image: media-sequencer:latest
+    container_name: media-sequencer
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      DATA_PATH: /app/data/state.json
+      STATIC_DIR: /app/public
+      ALLOWED_ORIGINS: "*"
+    volumes:
+      - sequencer-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  sequencer-data:

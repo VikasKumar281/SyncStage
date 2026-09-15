@@ -1,0 +1,59 @@
+# Single-container deployment: the Go binary serves the API *and* the built
+# React bundle from one origin. This is the simplest thing to deploy (one
+# service, one URL, no CORS) and is what `docker compose up` uses.
+#
+# Build from the repository root:
+#   docker build -f Dockerfile.allinone -t media-sequencer .
+
+# ---------------------------------------------------------------- frontend
+FROM node:20-alpine AS web
+
+WORKDIR /web
+
+COPY frontend/package.json frontend/package-lock.json* ./
+# `npm ci` when a lockfile is present, `npm install` otherwise, so the image
+# builds from a fresh clone either way.
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+COPY frontend/ ./
+
+# Empty base URL means same-origin requests, which is exactly right here.
+ENV VITE_API_BASE_URL=""
+RUN npm run build
+
+# ---------------------------------------------------------------- backend
+FROM golang:1.22-alpine AS build
+
+WORKDIR /src
+COPY backend/go.mod ./
+RUN go mod download
+COPY backend/ ./
+RUN go vet ./... && go test ./...
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
+
+# ---------------------------------------------------------------- runtime
+FROM alpine:3.20
+
+RUN apk add --no-cache ca-certificates tzdata \
+    && adduser -D -u 10001 sequencer
+
+WORKDIR /app
+COPY --from=build /out/server /app/server
+COPY --from=web /web/dist /app/public
+
+RUN mkdir -p /app/data && chown -R sequencer:sequencer /app
+VOLUME ["/app/data"]
+
+USER sequencer
+
+ENV PORT=8080 \
+    DATA_PATH=/app/data/state.json \
+    STATIC_DIR=/app/public \
+    ALLOWED_ORIGINS=*
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget -qO- "http://127.0.0.1:${PORT}/api/health" || exit 1
+
+ENTRYPOINT ["/app/server"]

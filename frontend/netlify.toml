@@ -1,0 +1,9 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Single-page app fallback so ?window=w2 deep links resolve.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

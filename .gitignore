@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build output
+frontend/dist/
+backend/server
+backend/bin/
+
+# Runtime state — seeded automatically on first start
+backend/data/*.json
+backend/data/.*.tmp
+
+# Environment
+.env
+.env.local
+*.local
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
