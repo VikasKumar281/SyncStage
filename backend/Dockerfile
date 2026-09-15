@@ -1,14 +1,13 @@
-FROM golang:1.22-alpine AS build
+FROM golang:1.25-alpine AS build
 
 WORKDIR /src
 
-COPY go.mod ./
+COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
 
 RUN go vet ./... && go test ./...
-
 
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -trimpath \
@@ -16,7 +15,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -o /out/server ./cmd/server
 
 FROM alpine:3.20
-
 
 RUN apk add --no-cache ca-certificates tzdata \
     && adduser -D -u 10001 sequencer
@@ -26,12 +24,10 @@ WORKDIR /app
 COPY --from=build /out/server /app/server
 
 RUN mkdir -p /app/data && chown -R sequencer:sequencer /app
-VOLUME ["/app/data"]
 
 USER sequencer
 
 ENV PORT=8080 \
-    DATA_PATH=/app/data/state.json \
     ALLOWED_ORIGINS=*
 
 EXPOSE 8080

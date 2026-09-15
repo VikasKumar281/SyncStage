@@ -424,7 +424,7 @@ connection.
 ## Project layout
 
 ```
-media-sequencer/
+SyncStage/
 ├── backend/
 │   ├── cmd/server/main.go              entrypoint, graceful shutdown
 │   ├── internal/
@@ -477,8 +477,8 @@ The two files marked ★ are the heart of the system and are worth reading first
 One service, one URL, no CORS, SPA routing handled by the Go binary.
 
 ```bash
-docker build -f Dockerfile.allinone -t media-sequencer .
-docker run -p 8080:8080 -v sequencer-data:/app/data media-sequencer
+docker build -f Dockerfile.allinone -t SyncStage .
+docker run -p 8080:8080 -v sequencer-data:/app/data SyncStage
 ```
 
 This image works as-is on Render, Railway, Fly.io, Google Cloud Run, or any host

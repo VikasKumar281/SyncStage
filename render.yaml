@@ -4,20 +4,15 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile.allinone
     dockerContext: .
-    plan: starter
+    plan: free
     healthCheckPath: /api/health
 
     envVars:
-      - key: DATA_PATH
-        value: /app/data/state.json
+      - key: DATABASE_URL
+        sync: false
 
       - key: CYCLE_SECONDS
         value: "18000"
 
       - key: ALLOWED_ORIGINS
         value: "*"
-
-    disk:
-      name: syncstage-data
-      mountPath: /app/data
-      sizeGB: 1
